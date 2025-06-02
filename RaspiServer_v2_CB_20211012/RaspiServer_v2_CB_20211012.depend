@@ -1,0 +1,264 @@
+# depslib dependency file v1.0
+1634051220 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/main.cpp
+	"SensorConnection/UDPSensorConnection.hpp"
+	"Message/Authenticator.hpp"
+	"Message/Type/MKeyExchange.hpp"
+	"Message/Type/MTimeInfo.hpp"
+	"Message/MessageFactory.hpp"
+	"Message/MessageHandler.hpp"
+	"Utility/message.h"
+	"Utility/diffiehellman.h"
+	<iostream>
+	<random>
+	<vector>
+	<string>
+	<cstdlib>
+	<memory>
+	<ctime>
+	<cstdlib>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/SensorConnection/UDPSensorConnection.hpp
+	<iostream>
+	"SensorConnection.hpp"
+	<atomic>
+	<thread>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/SensorConnection/SensorConnection.hpp
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Authenticator.hpp
+	"Type/Message.hpp"
+	"Type/MKeyExchange.hpp"
+	"Utility/sqlite3.h"
+	<memory>
+	<unordered_map>
+	<mutex>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Type/Message.hpp
+	<string>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Type/MKeyExchange.hpp
+	"Message.hpp"
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Type/MTimeInfo.hpp
+	"Message.hpp"
+	<chrono>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/MessageFactory.hpp
+	"Type/Message.hpp"
+	<string>
+	<memory>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/MessageHandler.hpp
+	"Type/Message.hpp"
+	<vector>
+	<memory>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/message.h
+	<stdbool.h>
+	<time.h>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/diffiehellman.h
+	<stdbool.h>
+
+1634034456 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Database/DBConnection.cpp
+	<Database/DBConnection.hpp>
+	<nlohmann/json.hpp>
+	"Curl/curl.h"
+	<stdio.h>
+	<string>
+	<iostream>
+	<sstream>
+	<fstream>
+	<stdlib.h>
+	<time.h>
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Authenticator.cpp
+	"Authenticator.hpp"
+	"Type/MKeyExchange.hpp"
+	"Utility/message.h"
+	"Utility/diffiehellman.h"
+	<iostream>
+	<typeinfo>
+	<chrono>
+	<random>
+	<cstring>
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/MessageFactory.cpp
+	"MessageFactory.hpp"
+	"Type/MSensorValue.hpp"
+	"Type/MAcknowledged.hpp"
+	"Type/MTimeInfo.hpp"
+	"Type/MKeyExchange.hpp"
+	"Utility/message.h"
+	<iostream>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Type/MSensorValue.hpp
+	"Message.hpp"
+	<string>
+	<chrono>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Type/MAcknowledged.hpp
+	"Message.hpp"
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/MessageHandler.cpp
+	<Database/DBConnection.hpp>
+	"MessageHandler.hpp"
+	"Authenticator.hpp"
+	"Type/MSensorValue.hpp"
+	"Type/MTimeInfo.hpp"
+	"Type/MAcknowledged.hpp"
+	"Type/MKeyExchange.hpp"
+	<typeinfo>
+	<string>
+	<map>
+	<chrono>
+	<iostream>
+	"Utility/message.h"
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Type/MAcknowledged.cpp
+	"MAcknowledged.hpp"
+	<cstring>
+	"Utility/message.h"
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Type/Message.cpp
+	"Message.hpp"
+	"../Authenticator.hpp"
+	"Utility/message.h"
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Type/MKeyExchange.cpp
+	"MKeyExchange.hpp"
+	"Utility/message.h"
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Type/MSensorValue.cpp
+	"MSensorValue.hpp"
+	<iostream>
+	<string>
+	<ios>
+	"Utility/message.h"
+	<stdlib.h>
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Message/Type/MTimeInfo.cpp
+	"MTimeInfo.hpp"
+	<iostream>
+	"Utility/message.h"
+	<ctime>
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/SensorConnection/BluetoothSensorConnection.cpp
+	"BluetoothSensorConnection.hpp"
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/SensorConnection/BluetoothSensorConnection.hpp
+	<thread>
+	<atomic>
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/SensorConnection/SensorConnection.cpp
+	"SensorConnection.hpp"
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/SensorConnection/UDPSensorConnection.cpp
+	"UDPSensorConnection.hpp"
+	"Message/MessageFactory.hpp"
+	"Message/MessageHandler.hpp"
+	<unistd.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<netinet/in.h>
+	<arpa/inet.h>
+	<vector>
+	<memory>
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/aes.c
+	<string.h>
+	"aes.h"
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/aes.h
+	<stdint.h>
+
+1594631060 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/diffiehellman.c
+	"diffiehellman.h"
+	"mini-gmp.h"
+	"sha3.h"
+	<stdlib.h>
+	<string.h>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/mini-gmp.h
+	<stddef.h>
+
+1594631061 /home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/sha3.h
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/message.c
+	"message.h"
+	"sha3.h"
+	"aes.h"
+	<stdlib.h>
+	<stdio.h>
+	<string.h>
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/mini-gmp.c
+	<assert.h>
+	<ctype.h>
+	<limits.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	"mini-gmp.h"
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/sha3.c
+	<string.h>
+
+1594631061 source:/home/pi/codeblocks/RaspiServer_v2_CB_20211012/Utility/sqlite3.c
+	"config.h"
+	<vxWorks.h>
+	<pthread.h>
+	"mingw.h"
+	"_mingw.h"
+	<stdarg.h>
+	<stdint.h>
+	<inttypes.h>
+	<intrin.h>
+	<cmnintrin.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<assert.h>
+	<stddef.h>
+	<TargetConditionals.h>
+	<ctype.h>
+	<time.h>
+	<sys/sysctl.h>
+	<malloc/malloc.h>
+	<libkern/OSAtomic.h>
+	<malloc.h>
+	<pthread.h>
+	"windows.h"
+	<sys/cygwin.h>
+	<errno.h>
+	<process.h>
+	<math.h>
+	<sys/types.h>
+	<sys/stat.h>
+	<fcntl.h>
+	<sys/ioctl.h>
+	<unistd.h>
+	<sys/time.h>
+	<errno.h>
+	<sys/mman.h>
+	<sys/file.h>
+	<sys/param.h>
+	<semaphore.h>
+	<limits.h>
+	<sys/mount.h>
+	<utime.h>
+	<sys/dcmd_blk.h>
+	<sys/statvfs.h>
+	<dlfcn.h>
+	"sqlite_tcl.h"
+	"tcl.h"
+	"sqlite3rtree.h"
+	<unicode/utypes.h>
+	<unicode/uregex.h>
+	<unicode/ustring.h>
+	<unicode/ucol.h>
+	<unicode/ubrk.h>
+	<unicode/utf16.h>
+	<ctype.h>
+	<math.h>
+
