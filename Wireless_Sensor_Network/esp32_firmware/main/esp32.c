@@ -14,11 +14,11 @@
 
 // --- Wi-Fi credentials ---
 
-#define WIFI_SSID      "EB2D"
-#define WIFI_PASS      "95454641"
+#define WIFI_SSID      "xxx"
+#define WIFI_PASS      "xxx"
 
 // --- MQTT broker ---
-#define MQTT_URI       "mqtt://193.196.52.201:1883"
+#define MQTT_URI       "mqtt://xxx.xxx.xx.xxx:1883"
 
 static const char *TAG = "MQTT_EXAMPLE";
 static esp_mqtt_client_handle_t mqtt_client;
