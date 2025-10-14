@@ -1,6 +1,0 @@
-{
-	"db_ip":"localhost",
-	"db_port":"8086",
-	"db_name":"park3WSN",
-	"db_measurement":"Sensors"
-}
