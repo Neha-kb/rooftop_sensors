@@ -1,2 +1,4 @@
 paho-mqtt
 influxdb-client
+pytz
+influxdb3-python
