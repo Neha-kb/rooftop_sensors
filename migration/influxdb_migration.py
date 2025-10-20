@@ -10,25 +10,24 @@ import pytz
 import time
 
 # --- OSS config ---
-OSS_URL = "xxx"
-OSS_TOKEN = "xxx"
+OSS_URL = "https://xxx.net:8086"
+OSS_TOKEN = os.environ.get("OSS_TOKEN")
 OSS_ORG = "IPV"
 OSS_BUCKET = "Uni"       
 
 
 # --- Cloud (destination) config ---
-CLOUD_URL = "xxx"
+CLOUD_URL = "https://aws.cloud.com"
 CLOUD_TOKEN = os.environ.get("INFLUXDB_TOKEN")
 CLOUD_ORG = "Institute of Photovoltaics"
 CLOUD_BUCKET = "migration_test"
-
 
 
 # --- Time range to migrate ---
 start_time = datetime.datetime(2025, 9, 1, 8, 0, 0, tzinfo=pytz.UTC)
 end_time   = datetime.datetime(2025 ,9, 1, 9, 0, 0, tzinfo=pytz.UTC)
 
-# --- Fields you actually want to migrate ---
+# --- Fields you want to migrate ---
 ALLOWED_FIELDS = {"Temp",  "U", "I", "P"}
 
 # --- Batch write control ---
@@ -52,6 +51,7 @@ client_oss = InfluxDBClient(url=OSS_URL, token=OSS_TOKEN, org=OSS_ORG)
 query_api = client_oss.query_api()
 
 print("Querying OSS data...")
+
 
 # --- Flux query (only the allowed fields) ---
 field_filters = " or ".join([f'r["_field"] == "{f}"' for f in ALLOWED_FIELDS])
