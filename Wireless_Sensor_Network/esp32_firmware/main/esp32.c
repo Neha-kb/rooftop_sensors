@@ -16,9 +16,9 @@
 
 
 // --- CONFIGURATION ---
-#define WIFI_SSID      "xxx"
-#define WIFI_PASS      "xxx"
-#define MQTT_URI       "mqtt://xxx.xxx.xx.xxx:1883"
+#define WIFI_SSID      "xxxx"
+#define WIFI_PASS      "xxxx"
+#define MQTT_URI       "mqtt://xxx:1883"
 
 // --- I2C (ADC) ---
 #define I2C_MASTER_SCL_IO           22
@@ -233,7 +233,7 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
 
-    // wifi_init_sta();
+    wifi_init_sta();
     i2c_master_init();
     max31865_init();
 
@@ -241,7 +241,7 @@ void app_main(void) {
     char macID[13];
     get_mac_address(macID, sizeof(macID));
     snprintf(topic, sizeof(topic), "sensor/%s", macID);
-    // mqtt_app_start();
+    mqtt_app_start();
 
     // Publish Loop
     while (1) {
@@ -258,8 +258,8 @@ void app_main(void) {
         printf("%s\n", payload);
 
 
-        // int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
-        // ESP_LOGI(TAG, "Published to %s: %s (msg_id=%d)", topic, payload, msg_id);
+        int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
+        ESP_LOGI(TAG, "Published to %s: %s (msg_id=%d)", topic, payload, msg_id);
 
         vTaskDelay(pdMS_TO_TICKS(5000));
     }

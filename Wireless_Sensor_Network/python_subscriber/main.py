@@ -5,17 +5,33 @@ import threading
 from queue import Queue
 from paho.mqtt import client as mqtt
 from influxdb_client_3 import InfluxDBClient3
+from paho.mqtt.client import CallbackAPIVersion
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# # --- MQTT config ---
+# MQTT_BROKER ="xxx"          # VM’s public IP
+# MQTT_PORT = 1883
+# MQTT_TOPIC = "sensor/#"
+
+# # --- InfluxDB Cloud config ---
+# CLOUD_URL = "xxxx"  # Cloud URL
+# CLOUD_TOKEN = os.environ.get("INFLUXDB_TOKEN")
+# CLOUD_ORG = "Insert org name"
+# CLOUD_BUCKET = "Insert bucket name"
 
 # --- MQTT config ---
-MQTT_BROKER = "xxx"          # your VM’s Mosquitto broker IP
-MQTT_PORT = 1883
-MQTT_TOPIC = "sensor/#"
+MQTT_BROKER = os.getenv("MQTT_BROKER")
+MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))  # default 1883 if missing
+MQTT_TOPIC = os.getenv("MQTT_TOPIC")
 
 # --- InfluxDB Cloud config ---
-CLOUD_URL = "xxx"  # Example — replace with yours
-CLOUD_TOKEN = os.environ.get("INFLUXDB_TOKEN")
-CLOUD_ORG = "Institute of Photovoltaics"
-CLOUD_BUCKET = "Sesnsor_test"
+CLOUD_URL = os.getenv("CLOUD_URL")
+CLOUD_TOKEN = os.getenv("INFLUXDB_TOKEN")
+CLOUD_ORG = os.getenv("CLOUD_ORG")
+CLOUD_BUCKET = os.getenv("CLOUD_BUCKET")
 
 # --- Mapping file ---
 DEVICE_MAP_FILE = "device_map.json"
@@ -123,7 +139,7 @@ def on_message(client, userdata, msg):
         print("Error handling MQTT message:", e)
 
 # --- MQTT Client ---
-mqtt_client = mqtt.Client("esp32-multi-client")
+mqtt_client = mqtt.Client(client_id="esp32-multi-client")
 mqtt_client.on_connect = on_connect
 mqtt_client.on_message = on_message
 

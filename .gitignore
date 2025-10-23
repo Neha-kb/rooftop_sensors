@@ -1,0 +1,32 @@
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+.env
+*.env
+*.log
+
+# ---- VS Code ----
+.vscode/
+.settings/
+
+# ---- ESP32 / PlatformIO / IDF ----
+build/
+sdkconfig
+sdkconfig.old
+*.bin
+*.elf
+*.map
+
+# ---- OS files ----
+.DS_Store
+Thumbs.db
+
+# ---- Project-specific ----
+device_map.json
+test.py
+influxdbOss_to_cloud_migration.py
+get_first_data_point.py

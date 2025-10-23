@@ -8,19 +8,38 @@ import os
 from collections import defaultdict
 import pytz
 import time
+from dotenv import load_dotenv
+
+
+# # --- OSS config ---
+# OSS_URL = "https://xxx.net:8086"
+# OSS_TOKEN = os.environ.get("OSS_TOKEN")
+# OSS_ORG = "xxx"
+# OSS_BUCKET = "xxx"       
+
+
+# # --- Cloud (destination) config ---
+# CLOUD_URL = "https://aws.cloud.com"
+# CLOUD_TOKEN = os.environ.get("INFLUXDB_TOKEN")
+# CLOUD_ORG = "xxx"
+# CLOUD_BUCKET = "xxx"
+
+
+# Load variables from .env file
+load_dotenv()
 
 # --- OSS config ---
-OSS_URL = "https://xxx.net:8086"
-OSS_TOKEN = os.environ.get("OSS_TOKEN")
-OSS_ORG = "IPV"
-OSS_BUCKET = "Uni"       
-
+OSS_URL = os.getenv("OSS_URL")
+OSS_TOKEN = os.getenv("OSS_TOKEN")
+OSS_ORG = os.getenv("OSS_ORG")
+OSS_BUCKET = os.getenv("OSS_BUCKET")
 
 # --- Cloud (destination) config ---
-CLOUD_URL = "https://aws.cloud.com"
-CLOUD_TOKEN = os.environ.get("INFLUXDB_TOKEN")
-CLOUD_ORG = "Institute of Photovoltaics"
-CLOUD_BUCKET = "migration_test"
+CLOUD_URL = os.getenv("CLOUD_URL")
+CLOUD_TOKEN = os.getenv("INFLUXDB_TOKEN")
+CLOUD_ORG = os.getenv("CLOUD_ORG")
+CLOUD_BUCKET = os.getenv("CLOUD_BUCKET")
+
 
 
 # --- Time range to migrate ---
