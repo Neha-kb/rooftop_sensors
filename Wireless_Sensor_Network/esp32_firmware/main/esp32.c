@@ -32,11 +32,13 @@
 #define I2C_MASTER_RX_BUF_DISABLE   0
 #define MCP3426_ADDR                0x6E  // I2C address of MCP3426
 
+
 // --- SPI (MAX31865) ---
 #define PIN_NUM_MISO 12
 #define PIN_NUM_MOSI 13
 #define PIN_NUM_CLK  14
 #define PIN_NUM_CS   15
+
 
 // --- MAX31865 TEMPERATURE ---
 #define MAX31865_REG_CONFIG  0x00
@@ -46,6 +48,7 @@
 #define MAX31865_CONFIG_4WIRE     0x00
 static const float A = 3.9083e-3;
 static const float B = -5.775e-7;
+
 
 // --- GLOBALS ---
 static const char *TAGMQTT = "ESP32_ADC_TEMP_MQTT";
@@ -58,6 +61,18 @@ static SemaphoreHandle_t i2c_semaphore = NULL;
 //  time variables for sending data
 #define SUNRISE_HOUR 6
 #define SUNSET_HOUR 18
+
+
+typedef struct {
+    float voltage;
+    float current;
+    float power;
+    float temperature;
+    time_t timestamp;
+} sensor_sample_t;
+
+static QueueHandle_t sensor_queue;
+
 
 
 // --- HELPER: MAC ADDRESS ---
@@ -246,9 +261,10 @@ void wifi_init_sta(void) {
 
 void obtain_time(void) {
     ESP_LOGI(TAGMQTT, "Initializing SNTP...");
-    sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "pool.ntp.org");
-    sntp_init();
+    esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
+    esp_sntp_setservername(0, "pool.ntp.org");
+    esp_sntp_init();
+
 
     // Wait for time synchronization
     time_t now = 0;
@@ -301,8 +317,53 @@ void sleep_until_sunrise(void) {
 }
 
 
+void sensor_task(void *pvParameters) {
+    while (1) {
+        sensor_sample_t sample;
+        sample.voltage = getVoltage();
+        sample.current = getCurrent();
+        sample.power = sample.voltage * sample.current;
+        sample.temperature = getTemperature();
+        sample.timestamp = time(NULL);
 
-// --- MAIN ---
+        // Send sample to Wi-Fi task
+        if (xQueueSend(sensor_queue, &sample, 0) != pdTRUE) {
+            ESP_LOGW(TAGMQTT, "Sensor queue full, dropping sample");
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000)); // 1 sec sampling
+    }
+}
+
+
+
+void wifi_mqtt_task(void *pvParameters) {
+
+    while (1) {
+        // Read samples from sensor queue
+        sensor_sample_t sample;
+        while (xQueueReceive(sensor_queue, &sample, 0)) {
+            char payload[200];
+            snprintf(payload, sizeof(payload),
+                "{\"voltage\": %.2f, \"current\": %.2f, \"power\": %.2f, \"temperature\": %.2f, \"timestamp\": %lld}",
+                    sample.voltage, sample.current, sample.power, sample.temperature, (long long)sample.timestamp);
+
+            int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
+            ESP_LOGI(TAGMQTT, "Published: %s (msg_id=%d)", payload, msg_id);
+        }
+
+        // Check if it's nighttime
+        if (!is_daytime()) {
+            ESP_LOGI(TAGMQTT, "Nighttime detected. Entering deep sleep...");
+            sleep_until_sunrise();
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(5000)); // 5 sec delay
+    }
+}
+
+
+
 void app_main(void) {
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
@@ -312,43 +373,77 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
 
-
     wifi_init_sta();            // initialize WiFi
     obtain_time();              // synchronize time via SNTP
+    // mqtt_app_start();     // start MQTT client
 
+    // Initialize hardware
     i2c_master_init();          // initialize I2C bus
     max31865_init();            // initialize MAX31865
 
+    // Create queue for sensor samples
+    sensor_queue = xQueueCreate(20, sizeof(sensor_sample_t));
 
     // Setup MQTT topic
     char macID[13];
     get_mac_address(macID, sizeof(macID));
     snprintf(topic, sizeof(topic), "sensor/%s", macID);
-    // mqtt_app_start();
 
-
-
-    // Publish Loop
-    while (1) {
-
-        if (!is_daytime()) {
-        ESP_LOGI(TAGMQTT, "Nighttime detected. Entering deep sleep...");
-        sleep_until_sunrise();
-    }
-
-        float voltage = getVoltage();
-        float current = getCurrent();
-        float power = voltage * current;
-        float temperature = getTemperature();
-
-        char payload[200];
-        snprintf(payload, sizeof(payload),
-                 "{\"voltage\": %.2f, \"current\": %.2f, \"power\": %.2f, \"temperature\": %.2f}",
-                 voltage, current, power, temperature);
-        printf("%s\n", payload);
-
-        int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
-        ESP_LOGI(TAGMQTT, "Published to %s: %s (msg_id=%d)", topic, payload, msg_id);
-        vTaskDelay(pdMS_TO_TICKS(5000));
-    }
+    // Create FreeRTOS tasks pinned to cores
+    xTaskCreatePinnedToCore(sensor_task, "sensor_task", 4096, NULL, 2, NULL, 0);     // Core 0
+    xTaskCreatePinnedToCore(wifi_mqtt_task, "wifi_mqtt_task", 8192, NULL, 2, NULL, 1); // Core 1
 }
+
+
+
+
+// // --- MAIN ---
+// void app_main(void) {
+//     // Initialize NVS
+//     esp_err_t ret = nvs_flash_init();
+//     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+//         ESP_ERROR_CHECK(nvs_flash_erase());
+//         ret = nvs_flash_init();
+//     }
+//     ESP_ERROR_CHECK(ret);
+
+
+//     wifi_init_sta();            // initialize WiFi
+//     obtain_time();              // synchronize time via SNTP
+
+//     i2c_master_init();          // initialize I2C bus
+//     max31865_init();            // initialize MAX31865
+
+
+//     // Setup MQTT topic
+//     char macID[13];
+//     get_mac_address(macID, sizeof(macID));
+//     snprintf(topic, sizeof(topic), "sensor/%s", macID);
+//     // mqtt_app_start();
+
+
+
+//     // Publish Loop
+//     while (1) {
+
+//         if (!is_daytime()) {
+//         ESP_LOGI(TAGMQTT, "Nighttime detected. Entering deep sleep...");
+//         sleep_until_sunrise();
+//     }
+
+//         float voltage = getVoltage();
+//         float current = getCurrent();
+//         float power = voltage * current;
+//         float temperature = getTemperature();
+
+//         char payload[200];
+//         snprintf(payload, sizeof(payload),
+//                  "{\"voltage\": %.2f, \"current\": %.2f, \"power\": %.2f, \"temperature\": %.2f}",
+//                  voltage, current, power, temperature);
+//         printf("%s\n", payload);
+
+//         int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
+//         ESP_LOGI(TAGMQTT, "Published to %s: %s (msg_id=%d)", topic, payload, msg_id);
+//         vTaskDelay(pdMS_TO_TICKS(5000));
+//     }
+// }
