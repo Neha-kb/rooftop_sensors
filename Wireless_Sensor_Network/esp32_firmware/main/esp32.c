@@ -20,12 +20,8 @@
 #include "env_config.h"
 #include "esp_mac.h"
 
+// Wifi configurations included in env_config.h
 
-
-// --- CONFIGURATION ---
-#define WIFI_SSID      "xxx"
-#define WIFI_PASS      "xxx"
-#define MQTT_URI       "mqtt://xxx:1883"
 
 // --- I2C (ADC) ---
 #define I2C_MASTER_SCL_IO           22
