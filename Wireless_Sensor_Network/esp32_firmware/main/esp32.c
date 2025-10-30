@@ -14,10 +14,17 @@
 #include "esp_log.h"
 #include "driver/i2c.h"
 #include "driver/spi_master.h"
+#include "esp_sntp.h"
+#include "time.h"
+#include "esp_sleep.h"
+#include "env_config.h"
+#include "esp_mac.h"
+
+
 
 // --- CONFIGURATION ---
-#define WIFI_SSID      "xxxx"
-#define WIFI_PASS      "xxxx"
+#define WIFI_SSID      "xxx"
+#define WIFI_PASS      "xxx"
 #define MQTT_URI       "mqtt://xxx:1883"
 
 // --- I2C (ADC) ---
@@ -50,6 +57,12 @@ static esp_mqtt_client_handle_t mqtt_client;
 static char topic[64];
 static spi_device_handle_t spi; // MAX31865 SPI handle
 static SemaphoreHandle_t i2c_semaphore = NULL;
+
+
+//  time variables for sending data
+#define SUNRISE_HOUR 6
+#define SUNSET_HOUR 18
+
 
 // --- HELPER: MAC ADDRESS ---
 void get_mac_address(char *mac_str, size_t len) {
@@ -154,6 +167,7 @@ void max31865_init(void) {
         .quadhd_io_num = -1,
         .max_transfer_sz = 16
     };
+
     spi_device_interface_config_t devcfg = {
         .clock_speed_hz = 1000000,
         .mode = 1,
@@ -214,6 +228,7 @@ static void mqtt_app_start(void) {
     esp_mqtt_client_start(mqtt_client);
 }
 
+
 // --- WIFI INIT ---
 void wifi_init_sta(void) {
     ESP_ERROR_CHECK(esp_netif_init());
@@ -233,6 +248,63 @@ void wifi_init_sta(void) {
 }
 
 
+void obtain_time(void) {
+    ESP_LOGI(TAGMQTT, "Initializing SNTP...");
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, "pool.ntp.org");
+    sntp_init();
+
+    // Wait for time synchronization
+    time_t now = 0;
+    struct tm timeinfo = { 0 };
+    int retry = 0;
+    const int retry_count = 10;
+
+    while (timeinfo.tm_year < (2016 - 1900) && ++retry < retry_count) {
+        ESP_LOGI(TAGMQTT, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+        vTaskDelay(pdMS_TO_TICKS(2000));
+        time(&now);
+        localtime_r(&now, &timeinfo);
+    }
+
+    if (timeinfo.tm_year >= (2016 - 1900)) {
+        ESP_LOGI(TAGMQTT, "Time synchronized successfully.");
+        char strftime_buf[64];
+        strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+        ESP_LOGI(TAGMQTT, "Current local time: %s", strftime_buf);
+    } else {
+        ESP_LOGW(TAGMQTT, "Failed to synchronize time.");
+    }
+}
+
+
+bool is_daytime(void) {
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+
+    int hour = timeinfo.tm_hour;
+    return (hour >= SUNRISE_HOUR && hour < SUNSET_HOUR);
+}
+
+
+
+void sleep_until_sunrise(void) {
+    time_t now;
+    struct tm timeinfo;
+    time(&now);
+    localtime_r(&now, &timeinfo);
+
+    int hours_to_sunrise = (24 + SUNRISE_HOUR - timeinfo.tm_hour) % 24;
+    int seconds_to_sunrise = hours_to_sunrise * 3600;
+
+    ESP_LOGI(TAGMQTT, "Sleeping for %d hours until sunrise...", hours_to_sunrise);
+    esp_sleep_enable_timer_wakeup((uint64_t)seconds_to_sunrise * 1000000ULL);
+    esp_deep_sleep_start();
+}
+
+
 
 // --- MAIN ---
 void app_main(void) {
@@ -244,9 +316,13 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
 
-    // wifi_init_sta();
-    i2c_master_init();
-    max31865_init();
+
+    wifi_init_sta();            // initialize WiFi
+    obtain_time();              // synchronize time via SNTP
+
+    i2c_master_init();          // initialize I2C bus
+    max31865_init();            // initialize MAX31865
+
 
     // Setup MQTT topic
     char macID[13];
@@ -254,8 +330,16 @@ void app_main(void) {
     snprintf(topic, sizeof(topic), "sensor/%s", macID);
     // mqtt_app_start();
 
+
+
     // Publish Loop
     while (1) {
+
+        if (!is_daytime()) {
+        ESP_LOGI(TAGMQTT, "Nighttime detected. Entering deep sleep...");
+        sleep_until_sunrise();
+    }
+
         float voltage = getVoltage();
         float current = getCurrent();
         float power = voltage * current;
