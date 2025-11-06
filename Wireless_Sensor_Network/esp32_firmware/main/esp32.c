@@ -284,7 +284,8 @@ void obtain_time(void) {
         char strftime_buf[64];
         strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
         ESP_LOGI(TAGMQTT, "Current local time: %s", strftime_buf);
-    } else {
+    } 
+    else {
         ESP_LOGW(TAGMQTT, "Failed to synchronize time.");
     }
 }
@@ -318,20 +319,18 @@ void sleep_until_sunrise(void) {
 
 
 void sensor_task(void *pvParameters) {
+    
     while (1) {
-        sensor_sample_t sample;
-        sample.voltage = getVoltage();
-        sample.current = getCurrent();
-        sample.power = sample.voltage * sample.current;
-        sample.temperature = getTemperature();
-        sample.timestamp = time(NULL);
+        float voltage = getVoltage();
+        float current = getCurrent();
+        float power = voltage * current;
+        float temp = getTemperature();
+        time_t timestamp = time(NULL);
 
-        // Send sample to Wi-Fi task
-        if (xQueueSend(sensor_queue, &sample, 0) != pdTRUE) {
-            ESP_LOGW(TAGMQTT, "Sensor queue full, dropping sample");
-        }
+        printf("Voltage: %.2f V, Current: %.2f A, Power: %.2f W, Temp: %.2f C, Timestamp: %s",
+               voltage, current, power, temp, ctime(&timestamp));
 
-        vTaskDelay(pdMS_TO_TICKS(1000)); // 1 sec sampling
+        vTaskDelay(pdMS_TO_TICKS(2000)); // delay in millisecond
     }
 }
 
@@ -358,15 +357,17 @@ void wifi_mqtt_task(void *pvParameters) {
             sleep_until_sunrise();
         }
 
-        vTaskDelay(pdMS_TO_TICKS(5000)); // 5 sec delay
+        vTaskDelay(pdMS_TO_TICKS(2000)); // delay in millisecond
     }
 }
 
 
 
 void app_main(void) {
+
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
+
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
         ret = nvs_flash_init();
