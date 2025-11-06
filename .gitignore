@@ -32,3 +32,4 @@ influxdbOss_to_cloud_migration.py
 get_first_data_point.py
 env_config.h
 generate_env_header.py
+test.c
