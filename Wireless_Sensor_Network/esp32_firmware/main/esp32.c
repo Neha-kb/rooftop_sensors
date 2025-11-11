@@ -159,6 +159,7 @@ float getVoltage()
     int adcReading = getADC(1);
     float voltage = ((float)adcReading / 2047.0f) * 2.048f; // ADC → volts
     voltage *= (118.0f + 4.02f) / 4.02f;                     // voltage divider
+    voltage *= 2;
     return voltage;
 }
 
@@ -167,7 +168,7 @@ float getCurrent()
     int adcReading = getADC(2);
     float voltage = ((float)adcReading / 2047.0f) * 2.048f; // volts
     float current = (voltage * 1.62f) - 0.33f; // apply sensor scaling factor
-    current = (current/0.264f);
+    current = (current/0.264f)*2;
     return (current < 0.0f) ? 0.0f : current;
 }
 
@@ -295,7 +296,7 @@ void wifi_init_sta(void) {
 void obtain_time(void) {
     ESP_LOGI(TAGMQTT, "Initializing SNTP...");
     esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
-    esp_sntp_setservername(0, "pool.ntp.org");
+    esp_sntp_setservername(0, "time3.uni-stuttgart.de");
     esp_sntp_init();
 
 
@@ -438,10 +439,9 @@ void wifi_mqtt_task(void *pvParameters) {
             bool wifi_ok = wifi_connected();
             bool day = is_daytime();
 
-            if (wifi_ok && !day) {
+            if (wifi_ok && day) {
                 ESP_LOGI(TAGMQTT, "Wi-Fi OK + Nighttime: Sending data via MQTT...");
                 send_via_mqtt(sample);
-                send_eeprom_data();
             } 
             else if (!wifi_ok && day) {
                 ESP_LOGW(TAGMQTT, "Wi-Fi down (Daytime): Storing sample to EEPROM...");
@@ -485,7 +485,7 @@ void app_main(void) {
     
     wifi_init_sta();            // initialize WiFi
     obtain_time();              // synchronize time via SNTP
-    // mqtt_app_start();     // start MQTT client
+    mqtt_app_start();     // start MQTT client
 
     if (!is_daytime() && wifi_connected()) {
         send_eeprom_data();
