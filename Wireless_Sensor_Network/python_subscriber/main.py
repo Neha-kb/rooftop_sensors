@@ -5,27 +5,16 @@ import threading
 from queue import Queue
 from paho.mqtt import client as mqtt
 from influxdb_client_3 import InfluxDBClient3
-from paho.mqtt.client import CallbackAPIVersion
 from dotenv import load_dotenv
+from datetime import datetime, timezone
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
-
-# # --- MQTT config ---
-# MQTT_BROKER ="xxx"          # VM’s public IP
-# MQTT_PORT = 1883
-# MQTT_TOPIC = "sensor/#"
-
-# # --- InfluxDB Cloud config ---
-# CLOUD_URL = "xxxx"  # Cloud URL
-# CLOUD_TOKEN = os.environ.get("INFLUXDB_TOKEN")
-# CLOUD_ORG = "Insert org name"
-# CLOUD_BUCKET = "Insert bucket name"
 
 # --- MQTT config ---
 MQTT_BROKER = os.getenv("MQTT_BROKER")
-MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))  # default 1883 if missing
-MQTT_TOPIC = os.getenv("MQTT_TOPIC")
+MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "sensor/#")
 
 # --- InfluxDB Cloud config ---
 CLOUD_URL = os.getenv("CLOUD_URL")
@@ -37,8 +26,8 @@ CLOUD_BUCKET = os.getenv("CLOUD_BUCKET")
 DEVICE_MAP_FILE = "device_map.json"
 
 # --- Batch configuration ---
-BATCH_SIZE = 20          # number of points before write
-BATCH_INTERVAL = 5       # seconds
+BATCH_SIZE = 20
+BATCH_INTERVAL = 5
 
 # --- Load or create device map ---
 def load_device_map():
@@ -46,7 +35,7 @@ def load_device_map():
         with open(DEVICE_MAP_FILE) as f:
             return json.load(f)
     else:
-        print(" No device_map.json found. Creating a new one.")
+        print("No device_map.json found. Creating a new one.")
         with open(DEVICE_MAP_FILE, "w") as f:
             json.dump({}, f, indent=2)
         return {}
@@ -75,20 +64,19 @@ def batch_writer():
 
     while True:
         try:
-            # Wait up to 1 sec for a message
             item = data_queue.get(timeout=1)
             buffer.append(item)
         except:
             pass  # queue empty
 
-        # Check flush conditions
         if len(buffer) >= BATCH_SIZE or (time.time() - last_flush) > BATCH_INTERVAL:
             if buffer:
                 try:
+                    # Make sure to use the correct precision — here we use 's' since ESP32 timestamp is in seconds
                     cloud_client.write(record=buffer, write_precision="s")
                     print(f"Wrote batch of {len(buffer)} points to InfluxDB Cloud")
                 except Exception as e:
-                    print(" Batch write failed:", e)
+                    print("Batch write failed:", e)
                 buffer.clear()
                 last_flush = time.time()
 
@@ -120,7 +108,18 @@ def on_message(client, userdata, msg):
 
         print(f"Data from {device_id}: {data}")
 
-        # Prepare InfluxDB point
+        # --- Extract and convert timestamp ---
+        ts = data.pop("timestamp", None)   # remove timestamp from fields
+        if ts is not None:
+            try:
+                # Convert epoch seconds to RFC3339 (UTC)
+                ts_iso = datetime.fromtimestamp(float(ts), tz=timezone.utc).isoformat()
+            except Exception:
+                ts_iso = datetime.now(timezone.utc).isoformat()
+        else:
+            ts_iso = datetime.now(timezone.utc).isoformat()
+
+        # --- Prepare InfluxDB point ---
         point = {
             "measurement": "solar_data",
             "tags": {
@@ -129,7 +128,7 @@ def on_message(client, userdata, msg):
                 "number": mapping.get("number", "Unknown")
             },
             "fields": {k: float(v) for k, v in data.items()},
-            "time": int(time.time())
+            "time": ts_iso
         }
 
         # Add to queue instead of direct write
