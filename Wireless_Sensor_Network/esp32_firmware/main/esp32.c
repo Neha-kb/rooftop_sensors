@@ -20,10 +20,11 @@
 #include "env_config.h"
 #include "esp_mac.h"
 
+
 // Wifi configurations included in env_config.h
 
 
-// --- I2C (ADC) ---
+// I2C (ADC)
 #define I2C_MASTER_SCL_IO           22
 #define I2C_MASTER_SDA_IO           21
 #define I2C_MASTER_NUM              I2C_NUM_0
@@ -33,14 +34,14 @@
 #define MCP3426_ADDR                0x6E  // I2C address of MCP3426
 
 
-// --- SPI (MAX31865) ---
+// SPI (MAX31865)
 #define PIN_NUM_MISO 12
 #define PIN_NUM_MOSI 13
 #define PIN_NUM_CLK  14
 #define PIN_NUM_CS   15
 
 
-// --- MAX31865 TEMPERATURE ---
+// MAX31865 TEMPERATURE
 #define MAX31865_REG_CONFIG  0x00
 #define MAX31865_REG_RTD_MSB 0x01
 #define MAX31865_CONFIG_BIAS_ON   0x80
@@ -50,7 +51,7 @@ static const float A = 3.9083e-3;
 static const float B = -5.775e-7;
 
 
-// --- GLOBALS ---
+// GLOBALS 
 static const char *TAGMQTT = "ESP32_ADC_TEMP_MQTT";
 static esp_mqtt_client_handle_t mqtt_client;
 static char topic[64];
@@ -81,7 +82,7 @@ sensor_sample_t eeprom_buffer[MAX_SAMPLES];
 int eeprom_index = 0;  // next free slot
 
 
-// --- HELPER: MAC ADDRESS ---
+//  HELPER: MAC ADDRESS 
 void get_mac_address(char *mac_str, size_t len) {
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
@@ -157,7 +158,7 @@ int getADC(uint8_t channel)
 float getVoltage()
 {
     int adcReading = getADC(1);
-    float voltage = ((float)adcReading / 2047.0f) * 2.048f; // ADC → volts
+    float voltage = ((float)adcReading / 2047.0f) * 2.048f; 
     voltage *= (118.0f + 4.02f) / 4.02f;                     // voltage divider
     voltage *= 2;
     return voltage;
@@ -166,14 +167,14 @@ float getVoltage()
 float getCurrent()
 {
     int adcReading = getADC(2);
-    float voltage = ((float)adcReading / 2047.0f) * 2.048f; // volts
+    float voltage = ((float)adcReading / 2047.0f) * 2.048f; 
     float current = (voltage * 1.62f) - 0.33f; // apply sensor scaling factor
     current = (current/0.264f)*2;
     return (current < 0.0f) ? 0.0f : current;
 }
 
 
-// --- MAX31865 INIT ---
+//  MAX31865 INIT
 void max31865_init(void) {
     esp_err_t ret;
     spi_bus_config_t buscfg = {
@@ -228,13 +229,22 @@ float getTemperature() {
     return temp;
 }
 
+bool mqtt_ready = false;
 
-// --- MQTT HANDLING ---
-void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
+void mqtt_event_handler(void *handler_args, esp_event_base_t base,
+                        int32_t event_id, void *event_data) {
     esp_mqtt_event_handle_t event = event_data;
-    if (event->event_id == MQTT_EVENT_CONNECTED)
+
+    if(event->event_id == MQTT_EVENT_CONNECTED) {
         ESP_LOGI(TAGMQTT, "MQTT connected");
+        mqtt_ready = true;
+    }
+    else if(event->event_id == MQTT_EVENT_DISCONNECTED) {
+        ESP_LOGW(TAGMQTT, "MQTT disconnected");
+        mqtt_ready = false;
+    }
 }
+
 
 static void mqtt_app_start(void) {
     esp_mqtt_client_config_t mqtt_cfg = {
@@ -246,7 +256,7 @@ static void mqtt_app_start(void) {
 }
 
 
-// --- Wi-Fi event handler for reconnection ---
+// Wi-Fi event handler for reconnection
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
                                int32_t event_id, void* event_data)
 {
@@ -260,7 +270,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 }
 
 
-// --- WIFI INIT ---
+//  WIFI INIT 
 void wifi_init_sta(void) {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -276,7 +286,7 @@ void wifi_init_sta(void) {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
     
-    // **Register event handler here**
+    // Register event handler here
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         WIFI_EVENT,
         ESP_EVENT_ANY_ID,
@@ -352,14 +362,14 @@ void sleep_until_sunrise(void) {
 }
 
 
-// --- CHECK WIFI CONNECTIVITY ---
+// CHECK WIFI CONNECTIVITY 
 bool wifi_connected() {
     wifi_ap_record_t ap_info;
     return (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK);
 }
 
 
-// --- SAVE SAMPLE TO EEPROM (simulated with RAM buffer) ---
+//  SAVE SAMPLE TO EEPROM (simulated with RAM buffer) 
 void save_to_eeprom(sensor_sample_t *sample, int index) {
     if (index < MAX_SAMPLES) {
         eeprom_buffer[index] = *sample;
@@ -368,23 +378,62 @@ void save_to_eeprom(sensor_sample_t *sample, int index) {
 }
 
 
-// --- SEND SAMPLE VIA MQTT ---
+// SEND SAMPLE VIA MQTT 
+// void send_via_mqtt(sensor_sample_t sample) {
+//     char payload[200];
+//     snprintf(payload, sizeof(payload),
+//              "{\"voltage\": %.2f, \"current\": %.2f, \"power\": %.2f, \"temperature\": %.2f, \"timestamp\": %lld}",
+//              sample.voltage, sample.current, sample.power, sample.temperature, (long long)sample.timestamp);
+
+    
+    
+//     if (mqtt_client != NULL) {
+//         int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
+//         ESP_LOGI(TAGMQTT, "Published: %s (msg_id=%d)", payload, msg_id);
+//     } else {
+//         ESP_LOGW(TAGMQTT, "MQTT client not started, cannot send");
+//     }
+// }
+
+
 void send_via_mqtt(sensor_sample_t sample) {
     char payload[200];
     snprintf(payload, sizeof(payload),
              "{\"voltage\": %.2f, \"current\": %.2f, \"power\": %.2f, \"temperature\": %.2f, \"timestamp\": %lld}",
              sample.voltage, sample.current, sample.power, sample.temperature, (long long)sample.timestamp);
 
-    if (mqtt_client != NULL) {
-        int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
-        ESP_LOGI(TAGMQTT, "Published: %s (msg_id=%d)", payload, msg_id);
-    } else {
+    // Check if MQTT client is initialized and connected
+    if (mqtt_client == NULL) {
         ESP_LOGW(TAGMQTT, "MQTT client not started, cannot send");
+        return;
+    }
+
+    // Wait until MQTT is connected
+    int retry_count = 0;
+    const int max_retries = 5;
+    while (!mqtt_ready && retry_count < max_retries) {
+        ESP_LOGW(TAGMQTT, "MQTT not connected yet, retrying... (%d/%d)", retry_count+1, max_retries);
+        vTaskDelay(pdMS_TO_TICKS(500));
+        retry_count++;
+    }
+
+    if (!mqtt_ready) {
+        ESP_LOGE(TAGMQTT, "MQTT not connected after retries, dropping message: %s", payload);
+        return;
+    }
+
+    // Attempt to publish
+    int msg_id = esp_mqtt_client_publish(mqtt_client, topic, payload, 0, 1, 0);
+    if (msg_id < 0) {
+        ESP_LOGE(TAGMQTT, "Failed to publish MQTT message: %s", payload);
+    } else {
+        ESP_LOGI(TAGMQTT, "Published: %s (msg_id=%d)", payload, msg_id);
     }
 }
 
 
-// --- SEND ALL EEPROM SAMPLES AFTER SUNSET ---
+
+// SEND ALL EEPROM SAMPLES AFTER SUNSET 
 void send_eeprom_data() {
     if (eeprom_index == 0) return; // nothing to send
     ESP_LOGI(TAGMQTT, "Sending %d stored samples from EEPROM...", eeprom_index);
@@ -396,7 +445,7 @@ void send_eeprom_data() {
     eeprom_index = 0; // clear buffer
 }
 
-// --- READ SAMPLE FROM EEPROM (RAM buffer for simulation) ---
+//  READ SAMPLE FROM EEPROM (RAM buffer for simulation) 
 void read_from_eeprom(int index, sensor_sample_t *sample) {
     if (index < MAX_SAMPLES && sample != NULL) {
         *sample = eeprom_buffer[index];
@@ -409,6 +458,7 @@ void read_from_eeprom(int index, sensor_sample_t *sample) {
 
 void sensor_task(void *pvParameters) {
     sensor_sample_t sample;
+
     while (1) {
         sample.voltage = getVoltage();
         sample.current = getCurrent();
@@ -421,7 +471,6 @@ void sensor_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(2000)); // delay in millisecond
     }
 }
-
 
 
 
@@ -445,6 +494,7 @@ void wifi_mqtt_task(void *pvParameters) {
             } 
             else if (!wifi_ok && day) {
                 ESP_LOGW(TAGMQTT, "Wi-Fi down (Daytime): Storing sample to EEPROM...");
+
                 if (eeprom_index < MAX_SAMPLES) {
                     save_to_eeprom(&sample, eeprom_index++);
                 } else {
@@ -455,7 +505,8 @@ void wifi_mqtt_task(void *pvParameters) {
                 sensor_sample_t readback;
                 for (int i = 0; i < eeprom_index; i++) {
                     read_from_eeprom(i, &readback);
-                    ESP_LOGI(TAGMQTT, "EEPROM[%d]: V=%.2f, I=%.2f, P=%.2f, T=%.2f, TS=%lld",
+                    ESP_LOGI(TAGMQTT,
+                             "EEPROM[%d]: V=%.2f, I=%.2f, P=%.2f, T=%.2f, TS=%lld",
                              i, readback.voltage, readback.current,
                              readback.power, readback.temperature,
                              (long long)readback.timestamp);
@@ -471,6 +522,7 @@ void wifi_mqtt_task(void *pvParameters) {
 }
 
 
+
 void app_main(void) {
 
     // Initialize NVS
@@ -482,10 +534,19 @@ void app_main(void) {
     }
     ESP_ERROR_CHECK(ret);
 
-    
-    wifi_init_sta();            // initialize WiFi
-    obtain_time();              // synchronize time via SNTP
-    mqtt_app_start();     // start MQTT client
+    wifi_init_sta();        // initialize WiFi
+    obtain_time();          // synchronize time via SNTP
+    mqtt_app_start();       // start MQTT client
+
+    // Wait until MQTT connected before starting tasks
+    int wait_count = 0;
+    while (!mqtt_ready && wait_count++ < 20) {  // max 20 x 500ms = 10s
+        ESP_LOGI(TAGMQTT, "Waiting for MQTT to connect...");
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+    if (!mqtt_ready) {
+        ESP_LOGW(TAGMQTT, "MQTT failed to connect after 10s");
+    }
 
     if (!is_daytime() && wifi_connected()) {
         send_eeprom_data();
@@ -493,8 +554,8 @@ void app_main(void) {
     }
 
     // Initialize hardware
-    i2c_master_init();          // initialize I2C bus
-    max31865_init();            // initialize MAX31865
+    i2c_master_init();      // initialize I2C bus
+    max31865_init();        // initialize MAX31865
 
     // Create queue for sensor samples
     sensor_queue = xQueueCreate(20, sizeof(sensor_sample_t));
@@ -507,6 +568,7 @@ void app_main(void) {
     // Create FreeRTOS tasks pinned to cores
     xTaskCreatePinnedToCore(sensor_task, "sensor_task", 8192, NULL, 2, NULL, 0);     // Core 0
     xTaskCreatePinnedToCore(wifi_mqtt_task, "wifi_mqtt_task", 12288, NULL, 2, NULL, 1); // Core 1
-    ESP_LOGI(TAGMQTT, "Sensor Task free stack: %u bytes", uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t));
 
+    ESP_LOGI(TAGMQTT, "Sensor Task free stack: %u bytes",
+             uxTaskGetStackHighWaterMark(NULL) * sizeof(StackType_t));
 }

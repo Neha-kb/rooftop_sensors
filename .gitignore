@@ -33,3 +33,7 @@ get_first_data_point.py
 env_config.h
 generate_env_header.py
 test.c
+test1.c
+test2.c 
+main.c 
+
