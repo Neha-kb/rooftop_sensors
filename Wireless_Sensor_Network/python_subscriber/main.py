@@ -1,146 +1,154 @@
 import json
-import time
 import os
-import threading
-from queue import Queue
+import logging
+import datetime as dt
+from datetime import timezone
+
 from paho.mqtt import client as mqtt
-from influxdb_client_3 import InfluxDBClient3
+import influxdb_client_3 as influx
+from influxdb_client_3.exceptions.exceptions import InfluxDBError
 from dotenv import load_dotenv
-from datetime import datetime, timezone
 
 # Load environment variables
 load_dotenv()
 
-# --- MQTT config ---
+# MQTT config
 MQTT_BROKER = os.getenv("MQTT_BROKER")
 MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
 MQTT_TOPIC = os.getenv("MQTT_TOPIC", "sensor/#")
 
-# --- InfluxDB Cloud config ---
+# InfluxDB Cloud config
 CLOUD_URL = os.getenv("CLOUD_URL")
-CLOUD_TOKEN = os.getenv("INFLUXDB_TOKEN")
 CLOUD_ORG = os.getenv("CLOUD_ORG")
+CLOUD_TOKEN = os.getenv("CLOUD_TOKEN")
 CLOUD_BUCKET = os.getenv("CLOUD_BUCKET")
 
-# --- Mapping file ---
+# Set your measurement name
+INFLUXDB_MEASUREMENT_NAME = "solar_data"
+
 DEVICE_MAP_FILE = "device_map.json"
 
-# --- Batch configuration ---
-BATCH_SIZE = 20
-BATCH_INTERVAL = 5
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-# --- Load or create device map ---
-def load_device_map():
+# Load or create device map
+def load_device_map() -> dict:
     if os.path.exists(DEVICE_MAP_FILE):
         with open(DEVICE_MAP_FILE) as f:
             return json.load(f)
-    else:
-        print("No device_map.json found. Creating a new one.")
-        with open(DEVICE_MAP_FILE, "w") as f:
-            json.dump({}, f, indent=2)
-        return {}
+    with open(DEVICE_MAP_FILE, "w") as f:
+        json.dump({}, f, indent=2)
+    return {}
 
-def save_device_map():
+def save_device_map(device_map: dict) -> None:
     with open(DEVICE_MAP_FILE, "w") as f:
         json.dump(device_map, f, indent=2)
 
 device_map = load_device_map()
 
-# --- Connect to InfluxDB Cloud ---
-cloud_client = InfluxDBClient3(
-    host=CLOUD_URL,
-    token=CLOUD_TOKEN,
-    org=CLOUD_ORG,
-    database=CLOUD_BUCKET
-)
+# InfluxDB callbacks
+def influx_success(self, data: bytes):
+    logger.info("influxdb_write_success")
 
-# --- Queue for batching ---
-data_queue = Queue()
+def influx_error(self, data: str, exception: InfluxDBError):
+    logger.error("influxdb_write_failure", extra=dict(data=data, cause=str(exception)))
 
-# --- Background batch writer thread ---
-def batch_writer():
-    buffer = []
-    last_flush = time.time()
+def influx_retry(self, data: str, exception: InfluxDBError):
+    logger.debug("influxdb_retry", extra=dict(data=data, cause=str(exception)))
 
-    while True:
-        try:
-            item = data_queue.get(timeout=1)
-            buffer.append(item)
-        except:
-            pass  # queue empty
+# Create InfluxDB client
+def create_influx_client() -> influx.InfluxDBClient3:
+    for var_name, var_value in [
+        ("CLOUD_TOKEN", CLOUD_TOKEN),
+        ("CLOUD_URL", CLOUD_URL),
+        ("CLOUD_BUCKET", CLOUD_BUCKET),
+        ("CLOUD_ORG", CLOUD_ORG)
+    ]:
+        if var_value is None:
+            raise RuntimeError(f"environment variable {var_name} is not set")
 
-        if len(buffer) >= BATCH_SIZE or (time.time() - last_flush) > BATCH_INTERVAL:
-            if buffer:
-                try:
-                    # Make sure to use the correct precision — here we use 's' since ESP32 timestamp is in seconds
-                    cloud_client.write(record=buffer, write_precision="s")
-                    print(f"Wrote batch of {len(buffer)} points to InfluxDB Cloud")
-                except Exception as e:
-                    print("Batch write failed:", e)
-                buffer.clear()
-                last_flush = time.time()
+    write_options = influx.WriteOptions(
+        flush_interval=2_000,
+        jitter_interval=500,
+        retry_interval=2_000,
+        max_retries=5,
+        max_retry_delay=15_000,
+        exponential_base=2,
+    )
 
-# Start batch writer thread
-threading.Thread(target=batch_writer, daemon=True).start()
+    options = influx.write_client_options(
+        success_callback=influx_success,
+        error_callback=influx_error,
+        retry_callback=influx_retry,
+        write_options=write_options,
+    )
 
-# --- MQTT Callbacks ---
+    return influx.InfluxDBClient3(
+        host=CLOUD_URL,
+        token=CLOUD_TOKEN,
+        org=CLOUD_ORG,             # specify org
+        database=CLOUD_BUCKET,     # specify bucket
+        write_client_options=options,
+    )
+
+influx_client = create_influx_client()
+
+# MQTT callbacks
 def on_connect(client, userdata, flags, rc):
-    print("Connected to MQTT broker with result code", rc)
+    logger.info("mqtt_connected", extra=dict(rc=rc))
     client.subscribe(MQTT_TOPIC)
 
 def on_message(client, userdata, msg):
     global device_map
-    try:
-        payload = msg.payload.decode()
-        data = json.loads(payload)
 
-        # Topic format: sensor/<mac_id>
+    try:
+        payload = json.loads(msg.payload.decode())
         topic_parts = msg.topic.split("/")
         device_id = topic_parts[1] if len(topic_parts) > 1 else "unknown"
 
-        # Lookup or auto-add device mapping
         mapping = device_map.get(device_id)
         if mapping is None:
             mapping = {"panel": "Unknown", "number": "Unknown"}
             device_map[device_id] = mapping
-            save_device_map()
-            print(f" New device detected: {device_id} → added to device_map.json")
+            save_device_map(device_map)
+            logger.info("new_device_detected", extra=dict(device=device_id))
 
-        print(f"Data from {device_id}: {data}")
-
-        # --- Extract and convert timestamp ---
-        ts = data.pop("timestamp", None)   # remove timestamp from fields
+        # Timestamp handling
+        ts = payload.pop("timestamp", None)
         if ts is not None:
             try:
-                # Convert epoch seconds to RFC3339 (UTC)
-                ts_iso = datetime.fromtimestamp(float(ts), tz=timezone.utc).isoformat()
+                timestamp = dt.datetime.fromtimestamp(float(ts), tz=timezone.utc)
             except Exception:
-                ts_iso = datetime.now(timezone.utc).isoformat()
+                timestamp = dt.datetime.now(timezone.utc)
         else:
-            ts_iso = datetime.now(timezone.utc).isoformat()
+            timestamp = dt.datetime.now(timezone.utc)
 
-        # --- Prepare InfluxDB point ---
-        point = {
-            "measurement": "solar_data",
-            "tags": {
-                "device": device_id,
-                "panel": mapping.get("panel", "Unknown"),
-                "number": mapping.get("number", "Unknown")
-            },
-            "fields": {k: float(v) for k, v in data.items()},
-            "time": ts_iso
-        }
+        # Build Influx point with measurement name
+        point = (
+            influx.Point(INFLUXDB_MEASUREMENT_NAME)
+            .time(timestamp, write_precision=influx.WritePrecision.S)
+            .tag("device", device_id)
+            .tag("panel", mapping.get("panel", "Unknown"))
+            .tag("number", mapping.get("number", "Unknown"))
+        )
 
-        # Add to queue instead of direct write
-        data_queue.put(point)
+        for key, value in payload.items():
+            point = point.field(key, float(value))
+
+        # Write to InfluxDB
+        influx_client.write(point)
 
     except Exception as e:
-        print("Error handling MQTT message:", e)
+        logger.exception("mqtt_message_processing_failed", extra=dict(error=str(e)))
 
-# --- MQTT Client ---
-mqtt_client = mqtt.Client(client_id="esp32-multi-client")
-mqtt_client.on_connect = on_connect
-mqtt_client.on_message = on_message
+# Main
+def main():
+    mqtt_client = mqtt.Client(client_id="esp32-multi-client")
+    mqtt_client.on_connect = on_connect
+    mqtt_client.on_message = on_message
 
-mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
-mqtt_client.loop_forever()
+    mqtt_client.connect(MQTT_BROKER, MQTT_PORT, 60)
+    mqtt_client.loop_forever()  # Blocking loop
+
+if __name__ == "__main__":
+    main()
