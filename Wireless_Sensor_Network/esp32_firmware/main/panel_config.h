@@ -4,7 +4,7 @@
 #include "esp_err.h"
 
 typedef struct {
-    char panel_label[32];
+    char location[32];
     char panel_sn[32];
 } panel_config_t;
 
